@@ -1,0 +1,4 @@
+__pycache__
+menv
+.pytest_cache
+.vscode
