@@ -106,7 +106,6 @@ class TestEuroCall:
         N = norm.cdf
         d1 = (np.log(S / K) + (r + sigma**2 / 2) * T) / (sigma * np.sqrt(T))
         d2 = d1 - sigma * np.sqrt(T)
-        print(d1)
         return S * N(d1) - K * np.exp(-r * T) * N(d2)
 
     def euro_call_strikes_expo(self, S, K, T, r, sigma):
@@ -114,7 +113,7 @@ class TestEuroCall:
 
     def simple_call_params(self):
         return {
-            "risk_free_rate": 1.04,
+            "risk_free_rate": 0.04,
             "volatilities": np.array([0.1, 0.2, 0.3]),
             "strike_prices": np.array([100, 105, 110, 120]),
             "current_price": 95,
