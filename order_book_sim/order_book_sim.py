@@ -34,9 +34,6 @@ class FifoOrderBook(OrderBook):
     def snapshot(self):
         return super().snapshot()
     
-    def market_buy(self, volume: int) -> List[LimitOrder]:
-        pass
-    
     def initialize_heaps(self, orders: Optional[List[LimitOrder]]):
         for o in orders:
             if o.buy:
@@ -44,7 +41,50 @@ class FifoOrderBook(OrderBook):
             else:
                 self.limit_order_sell(o)
     
-    # def limit_order_buy(volume: int, price: float): 
+    def market_buy(self, volume: int) -> List[LimitOrder]:
+        orders_to_complete = []
+        while volume > 0:
+            if self.ask.qsize() == 0:
+                return orders_to_complete
+            
+            ask_min = self.ask.get(timeout=2)
+
+            if volume >= ask_min.volume:
+                orders_to_complete.append(ask_min)
+                volume -= ask_min.volume
+            
+            elif volume < ask_min.volume:
+                partial_bid = ask_min.copy(deep=True)
+                partial_bid.volume = volume
+                orders_to_complete.append(partial_bid)
+                ask_min.volume -= volume
+                self.ask.put(partial_bid)
+                volume = 0
+        return orders_to_complete
+    
+    def market_sell(self, volume: int) -> List[LimitOrder]:
+        orders_to_complete = []
+        while volume > 0:
+            if self.bid.qsize() == 0:
+                return orders_to_complete
+            
+            bid_max = self.bid.get(timeout=2)
+
+            if volume >= bid_max.volume:
+                orders_to_complete.append(bid_max)
+                volume -= bid_max.volume
+            
+            elif volume < bid_max.volume:
+                partial_bid = bid_max.copy(deep=True)
+                partial_bid.volume = volume
+                orders_to_complete.append(partial_bid)
+                bid_max.volume -= volume
+                self.bid.put(partial_bid)
+                volume = 0 
+
+        return orders_to_complete
+    
+
     def limit_order_buy(self, order: LimitOrder):
         if self.ask.qsize() == 0:
             self.bid.put(order)
@@ -60,7 +100,7 @@ class FifoOrderBook(OrderBook):
         while (order.price > ask_min.price) and (volume > 0):
             if volume >= ask_min.volume:
                 orders_to_complete.append(ask_min)
-                volume - ask_min.volume
+                volume -= ask_min.volume
                 ask_min = self.ask.get() #here we will block if we dont have the other side to fill the order
             if volume < ask_min.volume:
                 partial_ask = ask_min.copy(deep=True)
@@ -84,7 +124,7 @@ class FifoOrderBook(OrderBook):
         while (order.price < bid_max.price) and (volume > 0):
             if volume >= bid_max.volume:
                 orders_to_complete.append(bid_max)
-                volume - bid_max.volume
+                volume -= bid_max.volume
                 bid_max = self.bid.get()
             if volume < bid_max.volume:
                 partial_ask = bid_max.copy(deep=True)
