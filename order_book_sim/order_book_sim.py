@@ -60,9 +60,9 @@ class FifoOrderBook(OrderBook):
         orders_to_complete = self.fulfill_buy(order.price, order.volume)
         remaining_volume = order.volume - sum(o.volume for o in orders_to_complete)
 
-        # if remaining_volume > 0:
-        #     order.volume = remaining_volume
-        #     self.bid.put(order)
+        if remaining_volume > 0:
+            order.volume = remaining_volume
+            self.bid.put(order)
 
         return orders_to_complete
 
@@ -73,9 +73,9 @@ class FifoOrderBook(OrderBook):
         orders_to_complete = self.fulfill_sell(order.price, order.volume)
         remaining_volume = order.volume - sum(o.volume for o in orders_to_complete)
 
-        # if remaining_volume > 0:
-        #     order.volume = remaining_volume
-        #     self.ask.put(order)
+        if remaining_volume > 0:
+            order.volume = remaining_volume
+            self.ask.put(order)
 
         return orders_to_complete
     
