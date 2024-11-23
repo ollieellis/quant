@@ -40,95 +40,98 @@ class FifoOrderBook(OrderBook):
                 self.limit_order_buy(o)
             else:
                 self.limit_order_sell(o)
-    
+
     def market_buy(self, volume: int) -> List[LimitOrder]:
+        """
+        Executes a market buy order for a given volume.
+        """
+        return self.fulfill_buy(float('inf'), volume)
+
+    def market_sell(self, volume: int) -> List[LimitOrder]:
+        """
+        Executes a market sell order for a given volume.
+        """
+        return self.fulfill_sell(-float('inf'), volume)
+
+    def limit_order_buy(self, order: LimitOrder):
+        """
+        Places a limit buy order and tries to fulfill it.
+        """
+        orders_to_complete = self.fulfill_buy(order.price, order.volume)
+        remaining_volume = order.volume - sum(o.volume for o in orders_to_complete)
+
+        # if remaining_volume > 0:
+        #     order.volume = remaining_volume
+        #     self.bid.put(order)
+
+        return orders_to_complete
+
+    def limit_order_sell(self, order: LimitOrder):
+        """
+        Places a limit sell order and tries to fulfill it.
+        """
+        orders_to_complete = self.fulfill_sell(order.price, order.volume)
+        remaining_volume = order.volume - sum(o.volume for o in orders_to_complete)
+
+        # if remaining_volume > 0:
+        #     order.volume = remaining_volume
+        #     self.ask.put(order)
+
+        return orders_to_complete
+    
+  
+    def fulfill_buy(self, price: float, volume: int) -> List[LimitOrder]:
+        """
+        Fulfills a buy order by matching it with the best available asks.
+        """
         orders_to_complete = []
         while volume > 0:
             if self.ask.qsize() == 0:
                 return orders_to_complete
-            
+
             ask_min = self.ask.get(timeout=2)
 
+            if price < ask_min.price:
+                self.ask.put(ask_min)
+                break
+
             if volume >= ask_min.volume:
                 orders_to_complete.append(ask_min)
                 volume -= ask_min.volume
-            
-            elif volume < ask_min.volume:
-                partial_bid = ask_min.copy(deep=True)
-                partial_bid.volume = volume
-                orders_to_complete.append(partial_bid)
-                ask_min.volume -= volume
-                self.ask.put(partial_bid)
-                volume = 0
-        return orders_to_complete
-    
-    def market_sell(self, volume: int) -> List[LimitOrder]:
-        orders_to_complete = []
-        while volume > 0:
-            if self.bid.qsize() == 0:
-                return orders_to_complete
-            
-            bid_max = self.bid.get(timeout=2)
-
-            if volume >= bid_max.volume:
-                orders_to_complete.append(bid_max)
-                volume -= bid_max.volume
-            
-            elif volume < bid_max.volume:
-                partial_bid = bid_max.copy(deep=True)
-                partial_bid.volume = volume
-                orders_to_complete.append(partial_bid)
-                bid_max.volume -= volume
-                self.bid.put(partial_bid)
-                volume = 0 
-
-        return orders_to_complete
-    
-
-    def limit_order_buy(self, order: LimitOrder):
-        if self.ask.qsize() == 0:
-            self.bid.put(order)
-            return []
-        
-        ask_min = self.ask.get()
-        if order.price < ask_min.price:
-            self.bid.put(order)
-            self.ask.put(ask_min)
-        
-        volume = order.volume
-        orders_to_complete = []
-        while (order.price > ask_min.price) and (volume > 0):
-            if volume >= ask_min.volume:
-                orders_to_complete.append(ask_min)
-                volume -= ask_min.volume
-                ask_min = self.ask.get() #here we will block if we dont have the other side to fill the order
-            if volume < ask_min.volume:
+            else:
                 partial_ask = ask_min.copy(deep=True)
                 partial_ask.volume = volume
                 orders_to_complete.append(partial_ask)
                 ask_min.volume -= volume
                 self.ask.put(ask_min)
-            
-    def limit_order_sell(self, order):
-        if self.bid.qsize() == 0:
-            self.ask.put(order)
-            return []
-        
-        bid_max = self.ask.get()
-        if order.price > bid_max.price:
-            self.ask.put(order)
-            self.bid.put(bid_max)
-        
-        volume = order.volume
+                volume = 0
+
+        return orders_to_complete
+
+    def fulfill_sell(self, price: float, volume: int) -> List[LimitOrder]:
+        """
+        Fulfills a sell order by matching it with the best available bids.
+        """
         orders_to_complete = []
-        while (order.price < bid_max.price) and (volume > 0):
+        while volume > 0:
+            if self.bid.qsize() == 0:
+                return orders_to_complete
+
+            bid_max = self.bid.get(timeout=2)
+
+            if price > bid_max.price:
+                self.bid.put(bid_max)
+                break
+
             if volume >= bid_max.volume:
                 orders_to_complete.append(bid_max)
                 volume -= bid_max.volume
-                bid_max = self.bid.get()
-            if volume < bid_max.volume:
-                partial_ask = bid_max.copy(deep=True)
-                partial_ask.volume = volume
-                orders_to_complete.append(partial_ask)
+            else:
+                partial_bid = bid_max.copy(deep=True)
+                partial_bid.volume = volume
+                orders_to_complete.append(partial_bid)
                 bid_max.volume -= volume
-                self.ask.put(bid_max)
+                self.bid.put(bid_max)
+                volume = 0
+
+        return orders_to_complete
