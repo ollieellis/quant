@@ -8,122 +8,178 @@ import uuid
 #limit bid/ask
 #stop market; once last traded stock hits price initiate a market order
 #stop limit: once last traded stock hits price initiate a limit order
+#cancel
 
-class MarketOrder(BaseModel):
+class MarketOrderBuy(BaseModel):
     ID: uuid.UUID = Field(default_factory=uuid.uuid4)
     volume: int
-    buy: bool
     creation_time: datetime = Field(default_factory=datetime.now)
 
-class LimitOrder(BaseModel):
-    ID: int = uuid.uuid4()
+class MarketOrderSell(BaseModel):
+    ID: uuid.UUID = Field(default_factory=uuid.uuid4)
+    volume: int
+    creation_time: datetime = Field(default_factory=datetime.now)
+
+MarketOrder = Union[MarketOrderBuy, MarketOrderSell]
+
+
+class LimitOrderBuy(BaseModel):
+    ID: uuid.UUID = Field(default_factory=uuid.uuid4)
     price: float
     volume: int  # for this sim we will only trade whole securitys
-    buy: bool
-    creation_time: datetime=datetime.now()
+    creation_time: datetime = Field(default_factory=datetime.now)
 
     def __lt__(self, other):
-        """Returns the priority needed by the priority Queue. 
-        If a buy, the bigger/newer order will be < smaller/older.
-        If a sell, lower/newer orders will be less than."""
-        if not isinstance(other, LimitOrder):
+        """Returns the priority needed by the priority Queue.
+        ie will return the *bigger* price; then compared by time"""
+        if not isinstance(other, LimitOrderBuy):
             return NotImplemented
 
-        if self.buy:
-            return self.greater_than(other)
-        else:
-            return self.less_than(other)
-
-    def __gt__(self, other):
-        """Returns the priority needed by the priority Queue.
-        If a buy, the bigger/newer order will be > bigger/newer.
-        If a sell, higher/older orders will be greater than."""
-        if not isinstance(other, LimitOrder):
-            return NotImplemented
-
-        if self.buy:
-            return self.less_than(other)
-        else:
-            return self.greater_than(other)
-
-    def __le__(self, other):
-        """Returns the priority needed by the priority Queue.
-        If a buy, the smaller/newer order will be >= bigger/newer.
-        If a sell, higher/older orders will be >= than."""   
-        return not self > other
-
-    def __ge__(self, other):
-        """Returns the priority needed by the priority Queue.
-        If a buy, the smaller/newer order will be <= bigger/newer.
-        If a sell, higher/older orders will be >= than."""           
-        return not self < other
-
-    def less_than(self, other):
-        if self.price < other.price:
-            return True
-        if self.price == other.price:
-            return self.creation_time < other.creation_time
-        return False
-
-    def greater_than(self, other):
         if self.price > other.price:
             return True
         if self.price == other.price:
             return self.creation_time < other.creation_time
-        return False
+
+    def __gt__(self, other):
+        """Returns the priority needed by the priority Queue.
+        ie will return the *smaller price; then compared by time"""
+        if not isinstance(other, LimitOrderBuy):
+            return NotImplemented
+
+        if self.price < other.price:
+            return True
+        if self.price == other.price:
+            return self.creation_time < other.creation_time
+
+    def __le__(self, other):
+        """Returns the priority needed by the priority Queue.
+        ie will return the *bigger* price; then compared by time"""
+        return not self > other
+
+    def __ge__(self, other):
+        """Returns the priority needed by the priority Queue.
+        ie will return the *smaller price; then compared by time"""          
+        return not self < other
     
 
-class StopBase(BaseModel):
-    ID: int = uuid.uuid4()
+class LimitOrderSell(BaseModel):
+    ID: uuid.UUID = Field(default_factory=uuid.uuid4)
+    price: float
+    volume: int  # for this sim we will only trade whole securitys
+    creation_time: datetime = Field(default_factory=datetime.now)
+
+    def __lt__(self, other):
+        """Returns the priority needed by the priority Queue.
+        ie will return the *smaller* price; then compared by time"""
+        if not isinstance(other, LimitOrderSell):
+            return NotImplemented
+
+        if self.price < other.price:
+            return True
+        if self.price == other.price:
+            return self.creation_time < other.creation_time
+
+    def __gt__(self, other):
+        """Returns the priority needed by the priority Queue.
+        ie will return the *bigger price; then compared by time"""
+        if not isinstance(other, LimitOrderSell):
+            return NotImplemented
+
+        if self.price > other.price:
+            return True
+        if self.price == other.price:
+            return self.creation_time < other.creation_time
+
+    def __le__(self, other):
+        """Returns the priority needed by the priority Queue.
+        ie will return the *bigger* price; then compared by time"""
+        return not self > other
+
+    def __ge__(self, other):
+        """Returns the priority needed by the priority Queue.
+        ie will return the *smaller price; then compared by time"""          
+        return not self < other
+
+LimitOrder = Union[LimitOrderBuy, LimitOrderSell]
+
+
+class StopBaseTriggerAbove(BaseModel):
+    ID: uuid.UUID = Field(default_factory=uuid.uuid4)
     trigger_price: float
-    trigger_above: bool
-    creation_time: datetime
+    creation_time: datetime = Field(default_factory=datetime.now)
 
     def __lt__(self, other):
         # if not isinstance(other, (StopOrder, StopLimit)):
         #     return NotImplemented
-        if self.trigger_above:
-            return self.less_than(other)
-        else:
-            return self.greater_than(other)
-
-    def __gt__(self, other):
-        # if not isinstance(other, (StopOrder, StopLimit)):
-        #     return NotImplemented
-        if self.trigger_above:
-            return self.greater_than(other)
-        else:
-            return self.less_than(other)
-
-    def __le__(self, other):
-        return not self > other
-
-    def __ge__(self, other):
-        return not self < other
-    
-    def less_than(self, other):
         if self.trigger_price < other.trigger_price:
             return True
         if self.trigger_price == other.trigger_price:
             return self.creation_time < other.creation_time
         return False
     
-    def greater_than(self, other):
+    def __gt__(self, other):
+        # if not isinstance(other, (StopOrder, StopLimit)):
+        #     return NotImplemented
         if self.trigger_price > other.trigger_price:
             return True
         if self.trigger_price == other.trigger_price:
             return self.creation_time < other.creation_time
         return False
+    
+    def __le__(self, other):
+        return not self > other
 
-class StopOrder(StopBase):
+    def __ge__(self, other):
+        return not self < other
+    
+class StopBaseTriggerBelow(BaseModel):
+    ID: uuid.UUID = Field(default_factory=uuid.uuid4)
+    trigger_price: float
+    creation_time: datetime = Field(default_factory=datetime.now)
+    
+    def __lt__(self, other):
+        # if not isinstance(other, (StopOrder, StopLimit)):
+        #     return NotImplemented
+        if self.trigger_price > other.trigger_price:
+            return True
+        if self.trigger_price == other.trigger_price:
+            return self.creation_time < other.creation_time
+        return False
+    
+    def __gt__(self, other):
+        # if not isinstance(other, (StopOrder, StopLimit)):
+        #     return NotImplemented
+        if self.trigger_price < other.trigger_price:
+            return True
+        if self.trigger_price == other.trigger_price:
+            return self.creation_time < other.creation_time
+        return False
+    
+    def __le__(self, other):
+        return not self > other
+
+    def __ge__(self, other):
+        return not self < other
+
+class StopOrderTriggerAbove(StopBaseTriggerAbove):
     order: MarketOrder
 
-class StopLimit(StopBase):
+class StopOrderTriggerBelow(StopBaseTriggerBelow):
+    order: MarketOrder
+
+StopOrder = Union[StopOrderTriggerAbove, StopOrderTriggerBelow]
+
+
+class StopLimitTriggerAbove(StopBaseTriggerAbove):
     order: LimitOrder 
 
+class StopLimitTriggerBelow(StopBaseTriggerBelow):
+    order: LimitOrder
+
+StopLimitOrder = Union[StopLimitTriggerAbove, StopLimitTriggerBelow]
 
 class Cancelation:
-    ID: int
-    creation_time: datetime
+    ID: uuid.UUID = Field(default_factory=uuid.uuid4)
+    creation_time: datetime = Field(default_factory=datetime.now)
     
-Order = Union[MarketOrder, LimitOrder, StopOrder, StopLimit, Cancelation]
+Order = Union[MarketOrder, LimitOrder, StopOrder, StopLimitOrder, Cancelation]

@@ -11,7 +11,7 @@ from typing import Optional, List, Dict
 
 from queue import PriorityQueue
 
-from models import LimitOrder
+from models import LimitOrder, MarketOrder, StopLimit, StopOrder
 from order_book import OrderBook
 
 class FifoOrderBook(OrderBook):
@@ -21,8 +21,8 @@ class FifoOrderBook(OrderBook):
         super().__init__()
         self.bid = PriorityQueue() 
         self.ask = PriorityQueue()
-        self.stop_bid = PriorityQueue()
-        self.stop_ask = PriorityQueue()
+        self.stop_above = PriorityQueue()
+        self.stop_below = PriorityQueue()
         self.cancels = set()
         self.volumes = {}
         self.initialize_heaps(orders)
@@ -38,10 +38,26 @@ class FifoOrderBook(OrderBook):
     
     def initialize_heaps(self, orders: Optional[List[LimitOrder]]):
         for o in orders:
-            if o.buy:
-                self.limit_order_buy(o)
-            else:
-                self.limit_order_sell(o)
+            #this should just call order...
+            match o: #maybe orderBuy should not be a flag...
+                case LimitOrder(buy=buy): #this provides o.buy as paramater buy
+                    if buy:
+                        self.limit_order_buy(o)
+                    else:
+                        self.limit_order_sell(o)
+                case MarketOrder(buy=buy, volume=volume): #this will break; as we can sell secs we dont own..
+                    if o.buy:
+                        self.market_buy(volume)
+                    else:
+                        self.market_sell(volume)
+                case StopLimit(trigger_above=trigger_above) | StopLimit(trigger_above=trigger_above):
+                    if trigger_above:
+                        self.stop_above.put(o)
+                    else:
+                        self.stop_below(o)
+                case _:
+                    raise ValueError(f"IDK what went wrong {type(o)}")
+
 
     def market_buy(self, volume: int) -> List[LimitOrder]:
         """
@@ -80,7 +96,9 @@ class FifoOrderBook(OrderBook):
             self.ask.put(order)
 
         return orders_to_complete
-    
+
+    def stop_above(self):
+        pass
   
     def fulfill_buy(self, price: float, volume: int) -> List[LimitOrder]:
         """
