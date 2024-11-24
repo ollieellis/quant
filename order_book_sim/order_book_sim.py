@@ -11,7 +11,7 @@ from typing import Optional, List, Dict
 
 from queue import PriorityQueue
 
-from models import LimitOrder, MarketOrder, StopLimit, StopOrder
+from models import *
 from order_book import OrderBook
 
 class FifoOrderBook(OrderBook):
@@ -28,7 +28,15 @@ class FifoOrderBook(OrderBook):
         self.initialize_heaps(orders)
 
     def order(self, order):
-        pass
+        match order:
+            case MarketOrderBuy(volume=volume):
+                self.market_buy(volume)
+            case MarketOrderSell(volume=volume):
+                self.market_sell(volume)
+            case LimitOrderBuy():
+                self.limit_order_buy(order)
+            case LimitOrderSell():
+                self.limit_order_sell(order)
 
     def cancel(self, order_id: int):
         pass
@@ -38,25 +46,7 @@ class FifoOrderBook(OrderBook):
     
     def initialize_heaps(self, orders: Optional[List[LimitOrder]]):
         for o in orders:
-            #this should just call order...
-            match o: #maybe orderBuy should not be a flag...
-                case LimitOrder(buy=buy): #this provides o.buy as paramater buy
-                    if buy:
-                        self.limit_order_buy(o)
-                    else:
-                        self.limit_order_sell(o)
-                case MarketOrder(buy=buy, volume=volume): #this will break; as we can sell secs we dont own..
-                    if o.buy:
-                        self.market_buy(volume)
-                    else:
-                        self.market_sell(volume)
-                case StopLimit(trigger_above=trigger_above) | StopLimit(trigger_above=trigger_above):
-                    if trigger_above:
-                        self.stop_above.put(o)
-                    else:
-                        self.stop_below(o)
-                case _:
-                    raise ValueError(f"IDK what went wrong {type(o)}")
+            self.order(o)
 
 
     def market_buy(self, volume: int) -> List[LimitOrder]:
