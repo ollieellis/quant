@@ -21,6 +21,8 @@ class FifoOrderBook(OrderBook):
         super().__init__()
         self.bid = PriorityQueue() 
         self.ask = PriorityQueue()
+        self.stop_bid = PriorityQueue()
+        self.stop_ask = PriorityQueue()
         self.cancels = set()
         self.volumes = {}
         self.initialize_heaps(orders)
